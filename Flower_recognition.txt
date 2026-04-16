@@ -1,0 +1,28 @@
+
+
+
+Commande pour connecter aux ordis :
+
+ssh mirmax@10.111.192.193 // 3 première lettres nom et 3 première lettres prénom + 10.111.192.19X X étant le numéro de la machine (nous dl3)
+
+CAN DO : 
+
+1) cd /srv/groups/group3/  //commande pour aller dans notre fichier de groupe. on peut double tab après "group" pour voir les différents groupes possibles
+
+2) nvidia-smi // pas accès!!
+=> gpurun nvidia-smi // Créer une queue d'attente pour accéder à la machine et à la carte graphique.
+
+3) commande pour voir les listes d'attente : squeue -u mirmax // liste d'attente à mon nom
+
+4) nano /srv/groups/group3/mirmax_job_xxx.log // pour voir l'&tat du job xxx
+
+5) gpurun python main.py // pour lancer le programme main.py sur la machine distante
+
+6) gpurunext python main.py // pour lancer le programme main.py sur une machine disponible immédiatement parmis les 5 autres machines)
+
+7) gprunnext sleep 15 // ???
+
+8) gpucancel xxx // pour annuler le job xxx
+
+9) scancel <job_id> // pour annuler un job en cours d'exécution (!!!!! PEUT ANNULER LE JOB DE QUELQU'UN D'AUTRE SI ON SE TROMPE DE NUMÉRO !!!!)
+
