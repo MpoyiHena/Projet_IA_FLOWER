@@ -62,10 +62,10 @@ def detect_flowers(image_path: Path):
         area = cv2.contourArea(contour)
         if area > 500:  # Seuil pour éviter les petits artefacts
             x, y, w, h = cv2.boundingRect(contour)
-            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 255), 2)
             # Ajouter le nom de la fleur et le pourcentage en haut à gauche du rectangle
             text = f"{flower_name}__{confidence}%"
-            cv2.putText(image, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(image, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
     return image
 
@@ -98,4 +98,4 @@ def track_images_with_detection(num_images: int = 5, inter_delay: float = 0.5, d
 
 if __name__ == "__main__":
     # Exemple d'utilisation : afficher 5 images avec détection
-    track_images_with_detection(num_images=10, inter_delay=0.5, display_delay=4.0)
+    track_images_with_detection(num_images=3, inter_delay=0.5, display_delay=4.0)
