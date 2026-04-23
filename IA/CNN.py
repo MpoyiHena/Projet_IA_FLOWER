@@ -8,12 +8,12 @@ from keras import layers
 from tensorflow import data as tf_data
 import os
 
-
+#https://keras.io/api/data_loading/image/
 
 def traitement_image():
     # Code pour le traitement d'image
-    train=keras.utils.image_dataset_from_directory(r"C:\Dossier E\Henallux\M1\Systeme inteligent\Projet\flowers\Dataset_flowers\Training Data",labels="inferred",batch_size=15746,image_size=(256,256),format="tf")
-    test=keras.utils.image_dataset_from_directory(r"C:\Dossier E\Henallux\M1\Systeme inteligent\Projet\flowers\Dataset_flowers\Testing Data",labels="inferred",batch_size=2460,image_size=(256,256),format="tf")
+    train=keras.utils.image_dataset_from_directory(r"Projet\flowers\Dataset_flowers\Training Data",labels="inferred",batch_size=100,image_size=(256,256),format="tf")
+    test=keras.utils.image_dataset_from_directory(r"Projet\flowers\Dataset_flowers\Testing Data",labels="inferred",batch_size=100,image_size=(256,256),format="tf")
 
     class_names = train.class_names
 
@@ -24,7 +24,8 @@ def traitement_image():
             plt.imshow(np.array(images[i]).astype("uint8"))
             plt.title(class_names[int(labels[i])])
             plt.axis("off")
-    plt.show()
+    # plt.show()
+
 
 
 traitement_image()
