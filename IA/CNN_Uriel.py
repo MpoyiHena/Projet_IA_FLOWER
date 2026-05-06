@@ -46,6 +46,13 @@ afficher_apercu_images(train, class_names, nb_images=9)
 # - normaliser_donnees() : divise les valeurs par le max pour avoir 0-1
 # - pipeline_preprocessing_complet() : applique tous les traitements ensemble
 
+# Applique la normalisation : divise les valeurs de pixels par 255 pour avoir 0-1
+train = train.map(lambda x, y: (x / 255.0, y))
+test = test.map(lambda x, y: (x / 255.0, y))
+
+# Applique l'augmentation de données sur l'ensemble d'entraînement uniquement
+train = train.map(lambda x, y: (augmentation_donnees(x), y))
+
 
 # ============================================================================
 # ETAPE 3 : CRÉATION DU MODELE CNN
@@ -61,7 +68,7 @@ model.add( keras.layers.Conv2D(
     16, (5,5),
     activation='relu',
     padding="same",
-    input_shape = (28,28,1)
+    input_shape = (256,256,3)
 ) )  # 16 filtres de convolution 2D, kernel 5x5
 # MaxPooling réduit la taille de l'image (2x2) en prenant le max
 model.add( keras.layers.MaxPooling2D((2,2)))
@@ -110,27 +117,19 @@ model.compile(
     metrics=['accuracy']  # Métrique à suivre
 )
 
-
 # ============================================================================
 # ETAPE 4 : ENTRAINEMENT DU MODELE CNN
 # ============================================================================
-
 # Hyperparamètres d'entraînement
-batch_size  = 600  # Nombre d'images traitées avant une mise à jour des poids
+batch_size  = 32  # Nombre d'images traitées avant une mise à jour des poids
 epochs      =  10  # Nombre de passages sur l'ensemble d'entraînement
-
-
-# Entraîne le modèle sur les données d'entraînement
-# NOTE : x_train et y_train doivent être définis (charger depuis les datasets)
 history = model.fit(
     train,
     batch_size      = batch_size,
     epochs          = epochs,
     verbose         = 1,  # Affiche la progression
-    validation_data = (test)  # Valide sur les données de test à chaque epoch
+    validation_data = test  # Valide sur les données de test à chaque epoch
 )
-
-
 # ============================================================================
 # ETAPE 5 : EVALUATION DU MODELE CNN
 # ============================================================================
