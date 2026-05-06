@@ -83,7 +83,7 @@ model.add( keras.layers.Dropout(0.2))
 
 # ---- BLOC CONVOLUTIF 2 ----
 # 32 filtres, kernel 5x5, activation ReLU
-model.add( keras.layers.Conv2D(16, (5,5), activation='relu', padding="same") )
+model.add( keras.layers.Conv2D(32, (5,5), activation='relu', padding="same") )
 model.add(keras.layers.BatchNormalization()) # Normalisation pour accélérer l'entraînement
 # MaxPooling réduit à nouveau la taille par 4
 model.add( keras.layers.MaxPooling2D((2,2)))
@@ -129,7 +129,7 @@ model.compile(
 # ============================================================================
 # Hyperparamètres d'entraînement
 batch_size  = 32  # Nombre d'images traitées avant une mise à jour des poids
-epochs      =  30  # Nombre de passages sur l'ensemble d'entraînement
+epochs      =  50  # Nombre de passages sur l'ensemble d'entraînement
 
 early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
