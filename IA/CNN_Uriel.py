@@ -93,18 +93,18 @@ model = keras.models.Sequential()
 model.add(keras.Input(shape=(256, 256, 3)))
 model.add(keras.layers.Conv2D(8, (5, 5), activation='relu', padding="same"))
 model.add(keras.layers.MaxPooling2D((2, 2)))
-model.add(keras.layers.Dropout(0.2))
+model.add(keras.layers.Dropout(0.3))
  
 # ---- BLOC CONVOLUTIF 2 ----
 model.add(keras.layers.Conv2D(16, (5, 5), activation='relu', padding="same"))
 model.add(keras.layers.BatchNormalization())
 model.add(keras.layers.MaxPooling2D((2, 2)))
-model.add(keras.layers.Dropout(0.2))
+model.add(keras.layers.Dropout(0.3))
  
 # ---- BLOC CONVOLUTIF 3 ----
 model.add(keras.layers.Conv2D(32, (5, 5), activation='relu', padding="same"))
 model.add(keras.layers.MaxPooling2D((2, 2)))
-model.add(keras.layers.Dropout(0.2))
+model.add(keras.layers.Dropout(0.3))
  
 # ---- COUCHES DE CLASSIFICATION ----
 model.add(keras.layers.Flatten())
