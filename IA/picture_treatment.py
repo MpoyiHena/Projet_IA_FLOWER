@@ -14,6 +14,8 @@ import random
 import glob
 from pathlib import Path
 
+print(tf.config.list_physical_devices('GPU'))
+
 # ============================================================================
 # 1. CHARGEMENT DES DONNEES
 # ============================================================================

@@ -149,7 +149,8 @@ score = model.evaluate(test, verbose=0)
 print(f'Test loss     : {score[0]:4.4f}')
 print(f'Test accuracy : {score[1]:4.4f}')
 print('Entraînement et évaluation terminés.')
- 
+
+model.save('model_flowers.h5')
  
  
  
