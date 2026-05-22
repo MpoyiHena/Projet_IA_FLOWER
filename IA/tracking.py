@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 # Importer les fonctions de picture_treatment.py
-from picture_treatment import get_image_folder, choose_random_image
+from IA_Flower.IA.picture_treatment_old import get_image_folder, choose_random_image
 
 def detect_flowers(image_path: Path):
     """

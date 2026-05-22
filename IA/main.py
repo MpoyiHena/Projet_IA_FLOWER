@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import picture_treatment as pt
-import CNN as cnn
+import IA_Flower.IA.picture_treatment_old as pt
+import IA.CNN_old1 as cnn
 
 #pt.callImage()
 cnn.traitement_image()

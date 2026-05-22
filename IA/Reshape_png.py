@@ -4,7 +4,7 @@ from pathlib import Path
 import time
 
 # Importer les fonctions de picture_treatment.py
-from picture_treatment import get_image_folder
+from IA_Flower.IA.picture_treatment_old import get_image_folder
 
 def load_and_calibrate_images(image_folder: Path, target_width: int = 640, target_height: int = 480):
     """

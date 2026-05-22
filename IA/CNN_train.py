@@ -12,7 +12,7 @@ from keras import layers
 import os
 from keras.callbacks import EarlyStopping
 
-from picture_treatment import (
+from IA_Flower.IA.picture_treatment_old import (
     charger_donnees,
     afficher_apercu_images,
     augmentation_donnees,

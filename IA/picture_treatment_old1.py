@@ -31,8 +31,7 @@ def charger_donnees(chemin_train, chemin_test, taille_image=256, batch_size_trai
         labels="inferred",
         batch_size=batch_size_test,
         image_size=(taille_image, taille_image),
-        format="tf",
-        shuffle=False
+        format="tf"
     )
     class_names = train.class_names
     return train, test, class_names
@@ -57,129 +56,158 @@ def afficher_apercu_images(dataset, class_names, nb_images=9):
 # 3. VRAIE AUGMENTATION DE DONNÉES - Multiplie le dataset par N
 # ============================================================================
 #
-# OPTIMISATIONS MÉMOIRE appliquées :
-#   - num_parallel_calls=2  au lieu de AUTOTUNE (évite de surcharger la RAM)
-#   - shuffle buffer_size=2000 au lieu de 10000 (moins de batches en mémoire)
-#   - prefetch(2) au lieu de AUTOTUNE (limite le pré-chargement)
+# PRINCIPE :
+#   On crée N copies du dataset, chacune avec une transformation différente
+#   et DÉTERMINISTE, puis on les CONCATÈNE.
+#   Le dataset final est N fois plus grand → N fois plus d'itérations/epoch.
 #
-# Ces réglages évitent le "BFCAllocator ran out of memory" sur CPU sans GPU.
-# Si tu as accès à un GPU avec assez de VRAM, tu peux remettre AUTOTUNE.
+#   15 746 images × 10 = 157 460 images → ~4920 iterations/epoch  ✓
+#
+# RÈGLE IMPORTANTE :
+#   Toutes les transformations utilisent UNIQUEMENT des ops TF pures.
+#   On n'instancie JAMAIS de couches Keras (RandomRotation, etc.) à l'intérieur
+#   d'un dataset.map → c'est la cause de l'erreur "rank 3 or 4 expected".
+#
+# Les 10 variantes :
+#   0 - Original              5 - Zoom avant (crop 80%)
+#   1 - Flip horizontal       6 - Zoom arrière (padding)
+#   2 - Flip vertical         7 - Luminosité +20%
+#   3 - Rotation +15°         8 - Luminosité -20%
+#   4 - Rotation -15°         9 - Flip H + Rotation 10°
 # ============================================================================
 
-def _rotation_batch(imgs, angle_deg):
+def _rotation_tf_pure(img, angle_deg):
     """
-    Rotation d'un batch float32 (B, H, W, C) — rank 4.
-    Utilise tf.raw_ops directement sur le batch, aucune dépendance externe.
+    Rotation d'une image float32 shape (H, W, C) via tf.raw_ops.
+    Aucune dépendance tensorflow_addons. Aucune couche Keras.
     """
     angle_rad = tf.cast(angle_deg * (3.14159265358979 / 180.0), tf.float32)
     cos_a = tf.math.cos(angle_rad)
     sin_a = tf.math.sin(angle_rad)
 
-    cx = 128.0
-    cy = 128.0
+    h = tf.cast(tf.shape(img)[0], tf.float32)
+    w = tf.cast(tf.shape(img)[1], tf.float32)
+    cx = w / 2.0
+    cy = h / 2.0
 
+    # Matrice projective 8 paramètres pour tf.raw_ops
     transform = tf.reshape(tf.stack([
         cos_a,  -sin_a, cx - cx * cos_a + cy * sin_a,
         sin_a,   cos_a, cy - cx * sin_a - cy * cos_a,
         0.0,     0.0
     ]), [1, 8])
 
+    img_4d = tf.expand_dims(img, 0)  # (1, H, W, C)
+
     rotated = tf.raw_ops.ImageProjectiveTransformV3(
-        images=imgs,                          # (B, 256, 256, 3) rank 4 ✓
+        images=img_4d,
         transforms=transform,
-        output_shape=tf.constant([256, 256]),
+        output_shape=tf.shape(img)[:2],
         interpolation="BILINEAR",
         fill_mode="REFLECT",
         fill_value=0.0
     )
-    return rotated
+    return tf.squeeze(rotated, 0)  # (H, W, C)
 
 
-def _appliquer_variante_batch(images, labels, variante_id):
+def _appliquer_variante(image, label, variante_id):
     """
-    Applique une transformation DÉTERMINISTE sur un batch entier.
-    images : (B, 256, 256, 3), float32, valeurs 0-255
+    Applique une transformation DÉTERMINISTE selon variante_id.
+    Uniquement des ops TF pures — compatible dataset.map sans erreur de shape.
     """
-    imgs = tf.cast(images, tf.float32) / 255.0
+    img = tf.cast(image, tf.float32) / 255.0
 
     if variante_id == 0:
-        pass
+        pass  # Original
 
     elif variante_id == 1:
-        imgs = tf.image.flip_left_right(imgs)
+        img = tf.image.flip_left_right(img)
 
     elif variante_id == 2:
-        imgs = tf.image.flip_up_down(imgs)
+        img = tf.image.flip_up_down(img)
 
     elif variante_id == 3:
-        imgs = _rotation_batch(imgs, angle_deg=15.0)
+        img = _rotation_tf_pure(img, angle_deg=15.0)
 
     elif variante_id == 4:
-        imgs = _rotation_batch(imgs, angle_deg=-15.0)
+        img = _rotation_tf_pure(img, angle_deg=-15.0)
 
     elif variante_id == 5:
-        crop_size = int(256 * 0.80)  # 204
-        offset = (256 - crop_size) // 2  # 26
-        imgs = imgs[:, offset:offset + crop_size, offset:offset + crop_size, :]
-        imgs = tf.image.resize(imgs, [256, 256])
+        # Zoom avant : crop central 80% puis resize
+        shape = tf.shape(img)
+        h = tf.cast(shape[0], tf.float32)
+        w = tf.cast(shape[1], tf.float32)
+        crop_h = tf.cast(h * 0.80, tf.int32)
+        crop_w = tf.cast(w * 0.80, tf.int32)
+        offset_h = (shape[0] - crop_h) // 2
+        offset_w = (shape[1] - crop_w) // 2
+        img = tf.image.crop_to_bounding_box(img, offset_h, offset_w, crop_h, crop_w)
+        img = tf.image.resize(img, [256, 256])
 
     elif variante_id == 6:
+        # Zoom arrière : padding puis resize
         pad = 30
-        imgs = tf.pad(imgs, [[0,0],[pad,pad],[pad,pad],[0,0]], mode='REFLECT')
-        imgs = tf.image.resize(imgs, [256, 256])
+        img = tf.image.resize_with_crop_or_pad(img, 256 + pad * 2, 256 + pad * 2)
+        img = tf.image.resize(img, [256, 256])
 
     elif variante_id == 7:
-        imgs = tf.image.adjust_brightness(imgs, delta=0.2)
-        imgs = tf.clip_by_value(imgs, 0.0, 1.0)
+        img = tf.image.adjust_brightness(img, delta=0.2)
+        img = tf.clip_by_value(img, 0.0, 1.0)
 
     elif variante_id == 8:
-        imgs = tf.image.adjust_brightness(imgs, delta=-0.2)
-        imgs = tf.clip_by_value(imgs, 0.0, 1.0)
+        img = tf.image.adjust_brightness(img, delta=-0.2)
+        img = tf.clip_by_value(img, 0.0, 1.0)
 
     elif variante_id == 9:
-        imgs = tf.image.flip_left_right(imgs)
-        imgs = _rotation_batch(imgs, angle_deg=10.0)
+        img = tf.image.flip_left_right(img)
+        img = _rotation_tf_pure(img, angle_deg=10.0)
 
-    return imgs, labels
+    return img, label
 
 
 def augmenter_dataset_reel(dataset, multiplicateur=10):
     """
     Crée un dataset augmenté en concaténant N variantes transformées.
-    Le dataset final est multiplicateur × plus grand que l'original.
+
+    C'est la VRAIE augmentation : le dataset final est multiplicateur
+    fois plus grand que l'original. Chaque image génère N copies distinctes.
 
     Paramètres:
         dataset       : Dataset TF original (non normalisé, valeurs 0-255)
-        multiplicateur: Nombre de copies (défaut 10 → ×10 images)
+        multiplicateur: Nombre de copies à créer (défaut 10)
 
     Retour:
         dataset_augmente : Dataset concaténé, normalisé, mélangé
     """
+    # Liste qui contiendra chaque variante du dataset
     variantes = []
 
     for i in range(multiplicateur):
-        vi = i % 10
+        # On force la variante à être dans [0, 9] pour utiliser les 10 transformations
+        vi = i % 10  # Capture la valeur, pas la variable de boucle
+
+        # Applique la transformation correspondante à chaque élément du dataset
         variante_i = dataset.map(
-            lambda x, y, v=vi: _appliquer_variante_batch(x, y, v),
-            num_parallel_calls=2   # ← Limité à 2 workers pour économiser la RAM
-                                   #   (AUTOTUNE utilisait trop de mémoire : 61GB+)
+            lambda x, y, v=vi: _appliquer_variante(x, y, v),
+            num_parallel_calls=tf.data.AUTOTUNE
         )
+
+        # Sauvegarde cette variante transformée
         variantes.append(variante_i)
 
+    # Concatène toutes les variantes une par une pour obtenir un dataset plus grand
     dataset_augmente = variantes[0]
     for v in variantes[1:]:
         dataset_augmente = dataset_augmente.concatenate(v)
 
-    # Buffer réduit : 2000 au lieu de 10000
-    # Chaque batch fait ~24MB (32 images × 256×256×3×4bytes)
-    # 2000 batches = ~48GB → encore beaucoup, mais TF ne les charge pas tous d'un coup
+    # Mélange les exemples pour éviter que les images transformées suivantes restent groupées
     dataset_augmente = dataset_augmente.shuffle(
-        buffer_size=500,
+        buffer_size=10000,
         reshuffle_each_iteration=True
     )
 
-    # prefetch(2) : prépare seulement 2 batches à l'avance
-    dataset_augmente = dataset_augmente.prefetch(2)
+    # Précharge les données pour améliorer les performances d'entraînement
+    dataset_augmente = dataset_augmente.prefetch(tf.data.AUTOTUNE)
 
     return dataset_augmente
 
@@ -250,9 +278,9 @@ def detecter_contours(image, method='canny'):
 
 def convertir_espace_couleur(image, espace='HSV'):
     conversions = {
-        'HSV':   cv2.COLOR_RGB2HSV,
-        'LAB':   cv2.COLOR_RGB2LAB,
-        'GRAY':  cv2.COLOR_RGB2GRAY,
+        'HSV': cv2.COLOR_RGB2HSV,
+        'LAB': cv2.COLOR_RGB2LAB,
+        'GRAY': cv2.COLOR_RGB2GRAY,
         'YCrCb': cv2.COLOR_RGB2YCrCb,
     }
     code = conversions.get(espace)
