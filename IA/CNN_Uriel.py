@@ -91,26 +91,26 @@ model = keras.models.Sequential()
 # ---- BLOC CONVOLUTIF 1 ----
  
 model.add(keras.Input(shape=(256, 256, 3)))
-model.add(keras.layers.Conv2D(8, (5, 5), activation='relu', padding="same"))
+model.add(keras.layers.Conv2D(16, (5, 5), activation='relu', padding="same"))
 model.add(keras.layers.MaxPooling2D((2, 2)))
-model.add(keras.layers.Dropout(0.3))
+model.add(keras.layers.Dropout(0.4))
  
 # ---- BLOC CONVOLUTIF 2 ----
-model.add(keras.layers.Conv2D(16, (5, 5), activation='relu', padding="same"))
+model.add(keras.layers.Conv2D(32, (5, 5), activation='relu', padding="same"))
 model.add(keras.layers.BatchNormalization())
 model.add(keras.layers.MaxPooling2D((2, 2)))
-model.add(keras.layers.Dropout(0.3))
+model.add(keras.layers.Dropout(0.4))
  
 # ---- BLOC CONVOLUTIF 3 ----
-model.add(keras.layers.Conv2D(32, (5, 5), activation='relu', padding="same"))
+model.add(keras.layers.Conv2D(64, (5, 5), activation='relu', padding="same"))
 model.add(keras.layers.MaxPooling2D((2, 2)))
-model.add(keras.layers.Dropout(0.3))
+model.add(keras.layers.Dropout(0.4))
  
 # ---- COUCHES DE CLASSIFICATION ----
 model.add(keras.layers.Flatten())
 #model.add(keras.layers.GlobalAveragePooling2D())  # ← Réduit drastiquement les params
-model.add(keras.layers.Dense(64, activation='relu'))
-model.add(keras.layers.Dropout(0.3))
+model.add(keras.layers.Dense(128, activation='relu'))
+model.add(keras.layers.Dropout(0.4))
 model.add(keras.layers.Dense(32, activation='relu'))
 model.add(keras.layers.Dropout(0.5))
 model.add(keras.layers.Dense(11, activation='softmax'))
