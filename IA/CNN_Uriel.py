@@ -11,7 +11,7 @@ import keras
 from keras import layers
 import os
 import sys
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
  
 # Ensure the local IA/powerwork.py module is loaded first.
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +32,8 @@ from picture_treatment import (
     augmenter_dataset_reel          # ← NOUVELLE FONCTION importée
 )
  
+print(tf.config.list_physical_devices('GPU'))
+
 # ============================================================================
 # ETAPE 1 : CHARGEMENT ET VISUALISATION DES DONNEES
 # ============================================================================
@@ -107,10 +109,10 @@ model.add(keras.layers.MaxPooling2D((2, 2)))
 model.add(keras.layers.Dropout(0.4))
  
 # ---- COUCHES DE CLASSIFICATION ----
-model.add(keras.layers.Flatten())
-#model.add(keras.layers.GlobalAveragePooling2D())  # ← Réduit drastiquement les params
-model.add(keras.layers.Dense(128, activation='relu'))
-model.add(keras.layers.Dropout(0.4))
+#model.add(keras.layers.Flatten())
+model.add(keras.layers.GlobalAveragePooling2D())  # ← Réduit drastiquement les params
+model.add(keras.layers.Dense(132, activation='relu'))
+model.add(keras.layers.Dropout(0.3))
 model.add(keras.layers.Dense(32, activation='relu'))
 model.add(keras.layers.Dropout(0.5))
 model.add(keras.layers.Dense(11, activation='softmax'))
@@ -129,15 +131,21 @@ model.compile(
  
 epochs = 50
  
-early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+checkpoint = ModelCheckpoint(
+    'best_model_flowers.h5',
+    monitor='val_loss',
+    save_best_only=True,
+    mode='min',
+    verbose=1
+)
  
-# On passe train_augmente (×5) au lieu de train
+# On passe train_augmente (×10) au lieu de train
 history = model.fit(
     train_augmente,             # ← dataset augmenté ×10
     epochs=epochs,
     verbose=1,
     validation_data=test,
-    #callbacks=[early_stop]      # EarlyStopping activé (avec ×10 data)
+    callbacks=[checkpoint]     # Enregistre le meilleur modèle pendant les 50 epochs
 )
  
  
@@ -149,9 +157,8 @@ score = model.evaluate(test, verbose=0)
 print(f'Test loss     : {score[0]:4.4f}')
 print(f'Test accuracy : {score[1]:4.4f}')
 print('Entraînement et évaluation terminés.')
-
-model.save('model_flowers.h5')
  
+model.save('model_flowers.h5')
  
  
 # ---------- Extraire les données de test en tableau pour les visualisations ----------
@@ -220,4 +227,5 @@ plt.title('Matrice de confusion par fleur')
 plt.xticks(rotation=45, ha='right')
 plt.yticks(rotation=0)
 plt.tight_layout()
+plt.savefig('confusion_matrix.png', dpi=200, bbox_inches='tight')
 plt.show()
