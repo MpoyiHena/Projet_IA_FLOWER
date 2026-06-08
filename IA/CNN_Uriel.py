@@ -129,7 +129,7 @@ model.compile(
 # ETAPE 4 : ENTRAINEMENT DU MODELE CNN
 # ============================================================================
  
-epochs = 50
+epochs = 75  # Augmentation du nombre d'epochs pour compenser la plus grande quantité de données
  
 checkpoint = ModelCheckpoint(
     'best_model_flowers.h5',
@@ -158,7 +158,7 @@ print(f'Test loss     : {score[0]:4.4f}')
 print(f'Test accuracy : {score[1]:4.4f}')
 print('Entraînement et évaluation terminés.')
  
-model.save('model_flowers.h5')
+model.save('my_model.keras')
  
  
 # ---------- Extraire les données de test en tableau pour les visualisations ----------

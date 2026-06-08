@@ -14,8 +14,6 @@ import random
 import glob
 from pathlib import Path
 
-print(tf.config.list_physical_devices('GPU'))
-
 # ============================================================================
 # 1. CHARGEMENT DES DONNEES
 # ============================================================================
@@ -145,7 +143,7 @@ def _appliquer_variante_batch(images, labels, variante_id):
     return imgs, labels
 
 
-def augmenter_dataset_reel(dataset, multiplicateur=10):
+def augmenter_dataset_reel(dataset, multiplicateur=1):
     """
     Crée un dataset augmenté en concaténant N variantes transformées.
     Le dataset final est multiplicateur × plus grand que l'original.
