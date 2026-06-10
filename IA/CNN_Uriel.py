@@ -11,6 +11,8 @@ import keras
 from keras import layers
 import os
 import sys
+from datetime import datetime
+import json
 from keras.callbacks import EarlyStopping, ModelCheckpoint
  
 # Ensure the local IA/powerwork.py module is loaded first.
@@ -129,10 +131,17 @@ model.compile(
 # ETAPE 4 : ENTRAINEMENT DU MODELE CNN
 # ============================================================================
  
-epochs = 75  # Augmentation du nombre d'epochs pour compenser la plus grande quantité de données
- 
+epochs = 50  # Augmentation du nombre d'epochs pour compenser la plus grande quantité de données
+
+# Création d'un dossier horodaté pour versionner cette exécution
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+output_dir = os.path.join(os.getcwd(), "runs", timestamp)
+os.makedirs(output_dir, exist_ok=True)
+print(f"[INFO] Sauvegarde des sorties dans: {output_dir}")
+
+# Checkpoint vers le dossier de sortie horodaté
 checkpoint = ModelCheckpoint(
-    'best_model_flowers.h5',
+    os.path.join(output_dir, 'best_model_flowers.h5'),
     monitor='val_loss',
     save_best_only=True,
     mode='min',
@@ -147,6 +156,10 @@ history = model.fit(
     validation_data=test,
     callbacks=[checkpoint]     # Enregistre le meilleur modèle pendant les 50 epochs
 )
+
+# Sauvegarder l'historique d'entraînement
+with open(os.path.join(output_dir, 'history.json'), 'w') as f:
+    json.dump(history.history, f)
  
  
 # ============================================================================
@@ -158,7 +171,7 @@ print(f'Test loss     : {score[0]:4.4f}')
 print(f'Test accuracy : {score[1]:4.4f}')
 print('Entraînement et évaluation terminés.')
  
-model.save('my_model.keras')
+model.save(os.path.join(output_dir, 'my_model.keras'))
  
  
 # ---------- Extraire les données de test en tableau pour les visualisations ----------
@@ -192,23 +205,42 @@ plt.ylabel('Loss')
 plt.legend(loc='upper right')
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('training_accuracy_loss.png', dpi=200, bbox_inches='tight')
+plt.savefig(os.path.join(output_dir, 'training_accuracy_loss.png'), dpi=200, bbox_inches='tight')
 plt.show()
  
 # ---------- Prédiction sur le jeu de test ----------
 y_pred_proba = model.predict(x_test, verbose=0)
 y_pred = np.argmax(y_pred_proba, axis=-1)
  
-pwk.plot_images(x_test, y_test, range(0, min(200, len(x_test))), columns=12, x_size=1, y_size=1, y_pred=y_pred, save_as='04-predictions')
+pwk.plot_images(x_test, y_test, range(0, min(200, len(x_test))), columns=12, x_size=1, y_size=1, y_pred=y_pred, save_as=os.path.join(output_dir, '04-predictions'))
  
-errors = [i for i in range(len(x_test)) if y_pred[i] != y_test[i]]
-errors = errors[:min(24, len(errors))]
-pwk.plot_images(x_test, y_test, errors, columns=6, x_size=2, y_size=2, y_pred=y_pred, save_as='05-some-errors')
- 
-print(classification_report(y_test, y_pred, target_names=class_names, digits=4))
-print('Global accuracy :', accuracy_score(y_test, y_pred))
- 
-# ---------- Heatmap de la matrice de confusion par fleur ----------
+erreurs_index = np.where(y_pred != y_test)[0]
+errors = erreurs_index[:min(24, len(erreurs_index))]
+# Afficher et sauvegarder les images mal classées
+incorrect_indices = erreurs_index
+print(f"Nombre d'erreurs trouvées : {len(incorrect_indices)}")
+
+# Dossier pour les images incorrectes
+errors_dir = os.path.join(output_dir, 'errors')
+os.makedirs(errors_dir, exist_ok=True)
+
+# Sauvegarde de chaque image mal classée
+for idx in incorrect_indices:
+    try:
+        img = x_test[idx]
+        # Si image normalisée entre 0 et 1, plt.imsave gère ça
+        true_label = int(y_test[idx]) if hasattr(y_test[idx], '__int__') else int(np.argmax(y_test[idx]))
+        pred_label = int(y_pred[idx]) if hasattr(y_pred[idx], '__int__') else int(np.argmax(y_pred[idx]))
+        true_name = class_names[true_label] if isinstance(class_names, (list, tuple)) else str(true_label)
+        pred_name = class_names[pred_label] if isinstance(class_names, (list, tuple)) else str(pred_label)
+        # Rendre le nom de fichier sûr
+        safe_true = str(true_name).replace(' ', '_')
+        safe_pred = str(pred_name).replace(' ', '_')
+        filename = f"{idx:05d}_true-{safe_true}_pred-{safe_pred}.png"
+        filepath = os.path.join(errors_dir, filename)
+        plt.imsave(filepath, np.clip(img, 0, 1))
+    except Exception as e:
+        print(f"Erreur en sauvegardant l'index {idx}: {e}")
 cm = confusion_matrix(y_test, y_pred)
 plt.figure(figsize=(14, 12))
 sns.heatmap(
@@ -227,5 +259,5 @@ plt.title('Matrice de confusion par fleur')
 plt.xticks(rotation=45, ha='right')
 plt.yticks(rotation=0)
 plt.tight_layout()
-plt.savefig('confusion_matrix.png', dpi=200, bbox_inches='tight')
+plt.savefig(os.path.join(output_dir, 'confusion_matrix.png'), dpi=200, bbox_inches='tight')
 plt.show()
