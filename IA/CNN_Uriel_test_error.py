@@ -210,11 +210,52 @@ plt.show()
  
 # ---------- Prédiction sur le jeu de test ----------
 y_pred_proba = model.predict(x_test, verbose=0)
+# Label prédit par argmax (sans tenir compte de la confiance)
 y_pred = np.argmax(y_pred_proba, axis=-1)
- 
+
+# Affichage rapide des premières prédictions (selon l'ancienne logique)
 pwk.plot_images(x_test, y_test, range(0, min(200, len(x_test))), columns=12, x_size=1, y_size=1, y_pred=y_pred, save_as=os.path.join(output_dir, '04-predictions'))
- 
-erreurs_index = np.where(y_pred != y_test)[0]
+
+# --- Détection des prédictions peu confiantes ("Unknown") ---
+# Seuil de confiance sous lequel on considère que le modèle "ne sait pas"
+CONF_THRESHOLD = 0.50  # ajuster si besoin (par ex. 0.6 pour être plus strict)
+
+# Probabilité maximale et prédiction finale tenant compte du seuil
+max_probs = np.max(y_pred_proba, axis=1)
+pred_argmax = np.argmax(y_pred_proba, axis=1)
+
+# Définir un indice dédié pour "Unknown" qui n'entre pas en conflit
+if isinstance(class_names, (list, tuple)):
+    n_known_classes = len(class_names)
+else:
+    # si class_names inattendu, estimer depuis y_test
+    n_known_classes = int(np.max(y_test)) + 1
+unknown_label = n_known_classes
+
+# y_pred_with_unknown contient unknown_label quand max_probs < CONF_THRESHOLD
+y_pred_with_unknown = np.where(max_probs < CONF_THRESHOLD, unknown_label, pred_argmax)
+
+# Créer dossier spécifique pour les prédictions inconnues
+unknown_dir = os.path.join(output_dir, 'errors', 'unknown_predictions')
+os.makedirs(unknown_dir, exist_ok=True)
+
+# Sauvegarde rapide des images jugées "Unknown" (limite à éviter d'enregistrer trop de fichiers)
+unknown_indices = np.where(max_probs < CONF_THRESHOLD)[0]
+for idx in unknown_indices:
+    try:
+        img = x_test[idx]
+        prob = float(max_probs[idx])
+        pred_label = int(pred_argmax[idx])
+        pred_name = class_names[pred_label] if isinstance(class_names, (list, tuple)) else str(pred_label)
+        safe_pred = str(pred_name).replace(' ', '_')
+        filename = f"{idx:05d}_unknown_prob-{prob:.2f}_pred-{safe_pred}.png"
+        filepath = os.path.join(unknown_dir, filename)
+        plt.imsave(filepath, np.clip(img, 0, 1))
+    except Exception as e:
+        print(f"Erreur en sauvegardant unknown index {idx}: {e}")
+
+# Erreurs : indices où la prédiction (incluant 'Unknown') diffère de la vérité
+erreurs_index = np.where(y_pred_with_unknown != y_test)[0]
 errors = erreurs_index[:min(24, len(erreurs_index))]
 
 # --- Préparation et affichage des erreurs ---
@@ -227,41 +268,51 @@ errors_dir = os.path.join(output_dir, 'errors')
 os.makedirs(errors_dir, exist_ok=True)
 
 # Parcours des indices incorrects et sauvegarde des images
-# for idx in incorrect_indices:
-#     try:
-#         # Récupère l'image correspondante depuis le tableau numpy x_test
-#         img = x_test[idx]
+for idx in incorrect_indices:
+    try:
+        # Récupère l'image correspondante depuis le tableau numpy x_test
+        img = x_test[idx]
 
-#         # Détermination des labels vrais et prédits (format entier)
-#         # y_test peut être soit un entier, soit un one-hot / vecteur — on normalise ici
-#         true_label = int(y_test[idx]) if hasattr(y_test[idx], '__int__') else int(np.argmax(y_test[idx]))
-#         pred_label = int(y_pred[idx]) if hasattr(y_pred[idx], '__int__') else int(np.argmax(y_pred[idx]))
+        # Détermination des labels vrais et prédits (format entier)
+        # y_test peut être soit un entier, soit un one-hot / vecteur — on normalise ici
+        true_label = int(y_test[idx]) if hasattr(y_test[idx], '__int__') else int(np.argmax(y_test[idx]))
+        # Utiliser la prédiction prenant en compte le seuil de confiance
+        pred_label = int(y_pred_with_unknown[idx])
 
-#         # Récupère le nom de classe lisible si disponible
-#         true_name = class_names[true_label] if isinstance(class_names, (list, tuple)) else str(true_label)
-#         pred_name = class_names[pred_label] if isinstance(class_names, (list, tuple)) else str(pred_label)
+        # Récupère le nom de classe lisible si disponible
+        true_name = class_names[true_label] if isinstance(class_names, (list, tuple)) else str(true_label)
+        if pred_label == unknown_label:
+            pred_name = 'Unknown'
+        else:
+            pred_name = class_names[pred_label] if isinstance(class_names, (list, tuple)) else str(pred_label)
 
-#         # Prépare un nom de fichier sûr (pas d'espaces)
-#         safe_true = str(true_name).replace(' ', '_')
-#         safe_pred = str(pred_name).replace(' ', '_')
-#         filename = f"{idx:05d}_true-{safe_true}_pred-{safe_pred}.png"
-#         filepath = os.path.join(errors_dir, filename)
+        # Prépare un nom de fichier sûr (pas d'espaces)
+        safe_true = str(true_name).replace(' ', '_')
+        safe_pred = str(pred_name).replace(' ', '_')
+        filename = f"{idx:05d}_true-{safe_true}_pred-{safe_pred}.png"
+        filepath = os.path.join(errors_dir, filename)
 
-#         # Sauvegarde l'image. Si les pixels sont normalisés [0,1], on clip pour être sûr.
-#         plt.imsave(filepath, np.clip(img, 0, 1))
+        # Sauvegarde l'image. Si les pixels sont normalisés [0,1], on clip pour être sûr.
+        plt.imsave(filepath, np.clip(img, 0, 1))
 
-#     except Exception as e:
-#         # Ne pas planter l'évaluation si une image pose problème — on log l'erreur
-#         print(f"Erreur en sauvegardant l'index {idx}: {e}")
-cm = confusion_matrix(y_test, y_pred)
+    except Exception as e:
+        # Ne pas planter l'évaluation si une image pose problème — on log l'erreur
+        print(f"Erreur en sauvegardant l'index {idx}: {e}")
+# Construire la matrice de confusion en incluant le label 'Unknown'
+if isinstance(class_names, (list, tuple)):
+    class_names_with_unknown = list(class_names) + ['Unknown']
+else:
+    class_names_with_unknown = [str(i) for i in range(n_known_classes)] + ['Unknown']
+labels_for_cm = list(range(n_known_classes)) + [unknown_label]
+cm = confusion_matrix(y_test, y_pred_with_unknown, labels=labels_for_cm)
 plt.figure(figsize=(14, 12))
 sns.heatmap(
     cm,
     annot=True,
     fmt='d',
     cmap='Blues',
-    xticklabels=class_names,
-    yticklabels=class_names,
+    xticklabels=class_names_with_unknown,
+    yticklabels=class_names_with_unknown,
     linewidths=0.5,
     linecolor='gray'
 )
@@ -273,4 +324,3 @@ plt.yticks(rotation=0)
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'confusion_matrix.png'), dpi=200, bbox_inches='tight')
 plt.show()
-
